@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>묘냥이 만들</title>
+<style>
+  body{
+    margin:24px; background:black; color:#f4f7fb;
+    font-family:ui-sans-serif,system-ui,-apple-system,"Noto Sans KR",sans-serif;
+  }
+  .row{display:flex; gap:24px; justify-content:center; align-items:flex-start}
+
+  #originalWrap{order:-1; width:420px; text-align:center;}
+  #originalWrap .title{margin-bottom:8px; font-weight:bold; font-size:1rem;}
+  #originalWrap img{width:420px; height:auto; display:block; margin:0 auto;}
+
+  #thumbs{margin-top:12px; display:grid; grid-template-columns:repeat(4,100px); gap:8px; justify-content:center;}
+  .thumb{position:relative; width:100px; height:100px; border:1px solid #666; background:#0f1115; overflow:hidden;}
+  .thumb img{position:absolute; pointer-events:none;}
+
+  .col{display:flex; flex-direction:column; align-items:center; gap:12px}
+
+  #stage{
+    width:420px; height:420px; position:relative;
+    border:1px solid #777; background:#111; overflow:hidden;
+  }
+  #stampName{font-weight:700; font-size:1rem}
+  button{
+    border:1px solid #555; background:#15181f; color:#f4f7fb;
+    padding:6px 10px; cursor:pointer; border-radius:0; outline:none;
+  }
+  button:hover{background:#f4f7fb; color:#15181f; border-color:#f4f7fb}
+
+  #stage::before{
+    content:"박스 안에 도장을 찍어 캐릭터를 완성하세요.";
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    color:#bbb; font-size:0.9rem; pointer-events:none;
+  }
+  #stage.has-click::before{display:none;}
+</style>
+</head>
+<body>
+
+<div class="row">
+  <div id="originalWrap">
+    <div class="title">원본</div>
+    <img src="0.all.png" alt="원본">
+    <div id="thumbs"></div>
+  </div>
+
+  <div class="col">
+    <div id="stampName">준비중…</div>
+    <div id="stage"></div>
+    <div>
+      <button id="revealBtn" style="display:none">결과 보기</button>
+      <button id="retryBtn"  style="display:none">다시 하기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const stamps = [
+    '1.tail.png','2.leftleg.png','3.rightleg.png','4.leftarm.png','5.rightarm.png',
+    '6.body.png','7.leftear.png','8.rightear.png','9.head.png',
+    '10.lefteye.png','11.righteye.png','12.mouth.png','13.effect.png'
+  ];
+  const SCALE = 1.2;  
+  let i = 0;
+  const stage     = document.getElementById('stage');
+  const stampName = document.getElementById('stampName');
+  const revealBtn = document.getElementById('revealBtn');
+  const retryBtn  = document.getElementById('retryBtn');
+  const thumbs    = document.getElementById('thumbs');
+  const placed = [];
+
+  function partName(path){ return path.split('.')[1] || path; }
+  function updateName(){ stampName.textContent = (i < stamps.length) ? partName(stamps[i]) : '완료'; }
+
+  const cursorStamp = document.createElement('img');
+  Object.assign(cursorStamp.style, {
+    position:'absolute',
+    transform:`translate(-50%, -50%) scale(${SCALE})`,
+    pointerEvents:'none', zIndex:9999
+  });
+  stage.appendChild(cursorStamp);
+  cursorStamp.src = stamps[i];
+  updateName();
+
+  stage.addEventListener('mousemove', (e) => {
+    const rect = stage.getBoundingClientRect();
+    cursorStamp.style.left = (e.clientX - rect.left) + 'px';
+    cursorStamp.style.top  = (e.clientY - rect.top ) + 'px';
+  });
+
+  stage.addEventListener('click', (e) => {
+    stage.classList.add('has-click');
+    if (i >= stamps.length) return;
+
+    const rect = stage.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const img = document.createElement('img');
+    img.src = stamps[i];
+    Object.assign(img.style, {
+      position:'absolute', left:x+'px', top:y+'px',
+      transform:`translate(-50%, -50%) scale(${SCALE})`,
+      pointerEvents:'none', opacity:'0'
+    });
+    stage.appendChild(img);
+    placed.push(img);
+
+    i++;
+    if (i < stamps.length) {
+      cursorStamp.src = stamps[i];
+      updateName();
+    } else {
+      cursorStamp.style.display = 'none';
+      revealBtn.style.display   = 'inline-block';
+      updateName();
+    }
+  });
+
+  revealBtn.addEventListener('click', () => {
+    placed.forEach(el => el.style.opacity = '1');
+    revealBtn.style.display = 'none';
+    retryBtn.style.display  = 'inline-block';
+  });
+
+  function makeThumbnail(){
+    const STAGE_W = 420, TH_W = 100, FACTOR = TH_W / STAGE_W;
+    const box = document.createElement('div');
+    box.className = 'thumb';
+    placed.forEach(srcEl => {
+      const mini = document.createElement('img');
+      mini.src = srcEl.src;
+      const left = parseFloat(srcEl.style.left);
+      const top  = parseFloat(srcEl.style.top);
+      const m = srcEl.style.transform.match(/scale\(([^)]+)\)/);
+      const baseScale = m ? parseFloat(m[1]) : 1;
+      const thumbScale = baseScale * FACTOR;
+      Object.assign(mini.style, {
+        left:(left*FACTOR)+'px', top:(top*FACTOR)+'px',
+        transform:`translate(-50%, -50%) scale(${thumbScale})`
+      });
+      box.appendChild(mini);
+    });
+    thumbs.appendChild(box);
+  }
+
+  retryBtn.addEventListener('click', () => {
+    makeThumbnail();
+    placed.forEach(el => el.remove());
+    placed.length = 0;
+    i = 0;
+    cursorStamp.src = stamps[i];
+    cursorStamp.style.display = '';
+    revealBtn.style.display   = 'none';
+    retryBtn.style.display    = 'none';
+    stage.classList.remove('has-click');
+    updateName();
+  });
+</script>
+</body>
+</html>
